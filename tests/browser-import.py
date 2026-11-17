@@ -100,7 +100,8 @@ def main():
                 page.get_by_text('↓ Last ned kopi fra før siste import', exact=True).click()
             recovery = json.loads(Path(download.value.path()).read_text())
             assert recovery['logs'][0]['status'] == 'partial'
-            assert recovery['draftsV4']['2026-11-16|interval']['state']['notes'] == 'Aktiv kladd må bevares'
+            recovery_draft = next(d for d in recovery['draftsV4'].values() if d['editingId'] == recovery['logs'][0]['id'])
+            assert recovery_draft['state']['notes'] == 'Aktiv kladd må bevares'
             upload(recovery)
             page.evaluate("quickLog('interval','2026-11-16')")
             assert page.locator('#logNotes').input_value() == 'Aktiv kladd må bevares'
@@ -141,7 +142,8 @@ def main():
             assert page.locator('.log-entry-controls .mark').first.get_attribute('aria-pressed') == 'true'
             page.locator('.log-save-bar .btn').last.click()
             assert page.evaluate('data.logs.length') == 1
-            assert page.evaluate('data.logs[0].exercises[0].sets[0].value') == 65
+            assert page.evaluate('data.logs[0].exercises[0].value') == 65
+            assert page.evaluate("'sets' in data.logs[0].exercises[0]") is False
             assert not errors, errors
             print('PASS: legacy log import, editing and saving; no JavaScript errors')
             context.close()
