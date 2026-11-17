@@ -1,0 +1,265 @@
+{
+  "version": 1,
+  "workouts": [
+    {
+      "id": "interval",
+      "day": 1,
+      "title": "Intervaller",
+      "location": "Energihuset Express",
+      "focus": "Løpskapasitet",
+      "description": "Terskel / VO₂-arbeid. Tilpass fart til dagsform.",
+      "exercises": [
+        {
+          "name": "Oppvarming",
+          "dose": "10",
+          "target": "9",
+          "unit": "km/t"
+        },
+        {
+          "name": "Intervall",
+          "dose": "4",
+          "target": "12.5",
+          "unit": "km/t"
+        },
+        {
+          "name": "Pause",
+          "dose": "2",
+          "target": "5",
+          "unit": "km/t"
+        },
+        {
+          "name": "Intervall",
+          "dose": "4",
+          "target": "12.5",
+          "unit": "km/t"
+        },
+        {
+          "name": "Pause",
+          "dose": "2",
+          "target": "5",
+          "unit": "km/t"
+        },
+        {
+          "name": "Intervall",
+          "dose": "4",
+          "target": "12.5",
+          "unit": "km/t"
+        },
+        {
+          "name": "Pause",
+          "dose": "2",
+          "target": "5",
+          "unit": "km/t"
+        },
+        {
+          "name": "Intervall",
+          "dose": "4",
+          "target": "12.5",
+          "unit": "km/t"
+        },
+        {
+          "name": "Nedjogging",
+          "dose": "8",
+          "target": "8",
+          "unit": "km/t"
+        }
+      ]
+    },
+    {
+      "id": "hyrox",
+      "day": 3,
+      "title": "HYROX + løping",
+      "location": "Vanlig Energihuset",
+      "focus": "Løpe etter stasjoner",
+      "description": "Jobb med teknikk og stasjonskapasitet. Belastning styres etter dagsform.",
+      "exercises": [
+        {
+          "name": "Løping mellom stasjoner",
+          "dose": "4 × 1 km (forslag)",
+          "target": "4",
+          "unit": "km"
+        },
+        {
+          "name": "Sled push",
+          "dose": "Kontrollerte drag (tilpass)",
+          "target": "",
+          "unit": "kg"
+        },
+        {
+          "name": "Sled pull",
+          "dose": "Kontrollerte drag (tilpass)",
+          "target": "",
+          "unit": "kg"
+        },
+        {
+          "name": "Burpee broad jumps",
+          "dose": "3 × 10 (forslag)",
+          "target": "30",
+          "unit": "reps"
+        },
+        {
+          "name": "Farmers carry",
+          "dose": "3 drag (forslag)",
+          "target": "",
+          "unit": "kg/hånd"
+        },
+        {
+          "name": "Wall balls",
+          "dose": "3 × 15 (forslag)",
+          "target": "",
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "id": "upper",
+      "day": 6,
+      "title": "Overkropp + rolig løp",
+      "location": "Vanlig Energihuset",
+      "focus": "Muskelvekst og aerob base",
+      "description": "Progressiv overkroppsstyrke, deretter lett løping. Start med belastning du kan kontrollere.",
+      "exercises": [
+        {
+          "name": "Benkpress",
+          "dose": "4 × 6",
+          "target": "",
+          "unit": "kg"
+        },
+        {
+          "name": "Skråbenk manualer",
+          "dose": "3 × 8–10",
+          "target": "",
+          "unit": "kg/hånd"
+        },
+        {
+          "name": "Roing",
+          "dose": "3 × 8–12",
+          "target": "",
+          "unit": "kg"
+        },
+        {
+          "name": "Nedtrekk",
+          "dose": "3 × 8–12",
+          "target": "",
+          "unit": "kg"
+        },
+        {
+          "name": "Sidehev",
+          "dose": "3 × 12–15",
+          "target": "",
+          "unit": "kg/hånd"
+        },
+        {
+          "name": "Rolig løp",
+          "dose": "20–30 min (forslag)",
+          "target": "25",
+          "unit": "min"
+        }
+      ]
+    },
+    {
+      "id": "legs",
+      "day": 0,
+      "title": "Bein + lett kondisjon",
+      "location": "Vanlig Energihuset",
+      "focus": "Beinstyrke og kapasitet",
+      "description": "Bygg styrke uten å gå på akkord med neste ukes løpsøkt.",
+      "exercises": [
+        {
+          "name": "Front squat",
+          "dose": "4 × 5–6",
+          "target": "",
+          "unit": "kg"
+        },
+        {
+          "name": "Rumensk markløft",
+          "dose": "3 × 8",
+          "target": "",
+          "unit": "kg"
+        },
+        {
+          "name": "Utfall",
+          "dose": "3 × 10/side",
+          "target": "",
+          "unit": "kg"
+        },
+        {
+          "name": "Leg curl",
+          "dose": "3 × 10–12",
+          "target": "",
+          "unit": "kg"
+        },
+        {
+          "name": "Lett kondisjon",
+          "dose": "10–20 min (forslag)",
+          "target": "15",
+          "unit": "min"
+        }
+      ]
+    }
+  ],
+  "pro": [
+    {
+      "id": "push",
+      "name": "Sled Push",
+      "target": 202,
+      "unit": "kg inkl. slede",
+      "current": null
+    },
+    {
+      "id": "pull",
+      "name": "Sled Pull",
+      "target": 153,
+      "unit": "kg inkl. slede",
+      "current": null
+    },
+    {
+      "id": "farmers",
+      "name": "Farmers Carry",
+      "target": 32,
+      "unit": "kg per hånd",
+      "current": null
+    },
+    {
+      "id": "lunges",
+      "name": "Sandbag Lunges",
+      "target": 30,
+      "unit": "kg",
+      "current": null
+    },
+    {
+      "id": "wall",
+      "name": "Wall Balls",
+      "target": 9,
+      "unit": "kg",
+      "current": null
+    }
+  ],
+  "logs": [
+    {
+      "id": "legacy-id",
+      "created": 123,
+      "date": "2026-11-15",
+      "type": "upper",
+      "title": "Eldre økt",
+      "rpe": 6,
+      "duration": null,
+      "notes": "",
+      "exercises": [
+        {
+          "name": "Benkpress",
+          "dose": "4 × 6",
+          "value": 65,
+          "unit": "kg"
+        }
+      ]
+    }
+  ],
+  "nutrition": [],
+  "settings": {
+    "sessions": 4,
+    "calories": 3000,
+    "protein": 150,
+    "gain": 0.15
+  }
+}
