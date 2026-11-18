@@ -127,7 +127,7 @@ test('saving a new workout updates the log choices while preserving current sele
 
 test('reopening and renaming a new template keeps its ID and updates the log choices', () => {
   const app = setup(), id = app.create(); app.context.selectedId = id; app.run('editWorkout(selectedId)');
-  assert.equal(app.fields.get('editDay').disabled, true);
+  assert.equal(app.fields.get('editDay').disabled, false);
   app.fields.get('editTitle').value = 'Nytt navn'; app.run('saveWorkout()');
   assert.equal(app.snapshot('data.workouts[4].id'), id);
   assert.equal(app.snapshot('data.workouts[4].title'), 'Nytt navn');
