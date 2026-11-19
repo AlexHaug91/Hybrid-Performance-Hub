@@ -77,8 +77,8 @@ def main():
                 assert page.evaluate('data.workouts.filter(w=>w.day===1).length') == 3
                 card('Mine intervaller').get_by_role('button', name='Logg', exact=True).click()
                 assert page.locator('#logType').input_value() == interval_id
-                assert page.locator('#l4-1-0-value').input_value() == '4.80'
-                assert page.locator('#l4-1-0-qty').input_value() == '4'
+                assert page.locator('#l4-1-0-value').input_value() == '4:48'
+                assert page.locator('#l4-1-0-qty').input_value() == '4:00'
                 page.get_by_role('button', name='✓ Registrer alle deler etter planen', exact=True).click()
                 page.locator('.log-save-bar .btn').last.click()
                 history_id = page.evaluate('data.logs.at(-1).id')
@@ -89,7 +89,7 @@ def main():
                 page.locator('#editTitle').fill('Mine intervaller endret'); save()
                 assert page.evaluate('data.logs.at(-1)') == history
                 nav('Logg'); page.locator('#logHistory .log-history-item').filter(has_text='Mine intervaller').get_by_role('button', name='Vis / rediger', exact=True).click()
-                assert float(page.locator('#l4-1-0-value').input_value()) == 4.8
+                assert page.locator('#l4-1-0-value').input_value() == '4:48'
                 page.locator('#logNotes').fill('Historisk kladd for egen intervall-ID')
 
                 start('Min HYROX og løping')
