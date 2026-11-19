@@ -89,8 +89,8 @@ def main():
             assert page.locator('#l4-1-0-qty').input_value() == '4'
             page.evaluate("nav('plan');editWorkout('interval');updateIntervalUnit(1,'min/km');saveWorkout()")
             page.evaluate("quickLog('interval','2026-11-18')")
-            assert float(page.locator('#l4-1-0-value').input_value()) == 4.8
-            assert page.locator('#l4-1-0-qty').input_value() == '4'
+            assert page.locator('#l4-1-0-value').input_value() == '4:48'
+            assert page.locator('#l4-1-0-qty').input_value() == '4:00'
             print('PASS: time intervals, km/h and min/km remain supported')
             page.evaluate("nav('plan');editWorkout('hyrox');updateEditEx(0,'dose','4 × 1 km + 2 × 500 m');saveWorkout();quickLog('hyrox','2026-11-19')")
             assert page.locator('#l4-0-0-value').input_value() == ''
