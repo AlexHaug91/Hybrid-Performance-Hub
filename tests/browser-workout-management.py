@@ -5,6 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 from playwright.sync_api import sync_playwright
+from browser_plan_helpers import plan_action
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,7 +44,7 @@ def main():
 
                 nav('Plan')
                 original = page.evaluate("structuredClone(data.workouts.find(w=>w.id==='interval'))")
-                card('Intervaller').get_by_role('button', name='Kopier', exact=True).click()
+                plan_action(page, card('Intervaller'), 'Kopier').click()
                 page.locator('#editTitle').fill('Intervallkopi')
                 page.locator('#editDay').select_option('1')
                 page.locator('.interval-row').nth(1).locator('input').nth(1).fill('14')
@@ -52,14 +53,14 @@ def main():
                 copied_id = page.evaluate('data.workouts.at(-1).id')
                 assert copied_id != 'interval'
                 assert page.evaluate("data.workouts.find(w=>w.id==='interval')") == original
-                card('Intervallkopi').get_by_role('button', name='Logg', exact=True).click()
+                card('Intervallkopi').get_by_role('button', name='Logg økt', exact=True).click()
                 assert page.locator('#l4-1-0-value').input_value() == '14'
                 page.get_by_role('button', name='✓ Registrer alle deler etter planen', exact=True).click()
                 page.locator('.log-save-bar .btn').last.click()
                 history_id = page.evaluate('data.logs[0].id')
                 history = page.evaluate('structuredClone(data.logs[0])')
 
-                nav('Plan'); card('Intervallkopi').get_by_role('button', name='Flytt', exact=True).click()
+                nav('Plan'); plan_action(page, card('Intervallkopi'), 'Flytt').click()
                 assert page.locator('#editDay').is_enabled()
                 page.locator('#editDay').select_option('0'); save_template()
                 assert page.evaluate('data.workouts.at(-1).id') == copied_id
@@ -70,10 +71,10 @@ def main():
 
                 # Removing a template is cancellable and cannot remove its log.
                 accept['value'] = False
-                card('Intervallkopi').get_by_role('button', name='Fjern', exact=True).click()
+                plan_action(page, card('Intervallkopi'), 'Fjern').click()
                 assert card('Intervallkopi').count() == 1
                 accept['value'] = True
-                card('Intervallkopi').get_by_role('button', name='Fjern', exact=True).click()
+                plan_action(page, card('Intervallkopi'), 'Fjern').click()
                 assert card('Intervallkopi').count() == 0
                 assert page.evaluate('data.logs[0]') == history
                 assert page.locator(f'#logType option[value="{copied_id}"]').count() == 0
@@ -92,7 +93,7 @@ def main():
                 assert page.locator(f'#logType option[value="{copied_id}"]').count() == 0
                 page.locator('#l4-0-0-value').fill('72.5')
                 page.locator('#logNotes').fill('Beholdt styrkekladd')
-                nav('Plan'); card('Overkropp + rolig løp').get_by_role('button', name='Fjern', exact=True).click()
+                nav('Plan'); plan_action(page, card('Overkropp + rolig løp'), 'Fjern').click()
                 assert card('Overkropp + rolig løp').count() == 0
                 assert page.locator('#archivedDraftsCard').is_visible()
                 page.reload(); nav('Plan')
@@ -123,14 +124,14 @@ def main():
                 nav('Plan')
                 before = page.evaluate('JSON.stringify(data)')
                 page.evaluate("""() => {window.realSetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(key==='hyrox_performance_hub_v1')throw new DOMException('Full','QuotaExceededError');return window.realSetItem.call(this,key,value)}}""")
-                card('Bein + lett kondisjon').get_by_role('button', name='Fjern', exact=True).click()
+                plan_action(page, card('Bein + lett kondisjon'), 'Fjern').click()
                 assert page.evaluate('JSON.stringify(data)') == before
                 assert card('Bein + lett kondisjon').count() == 1
                 assert 'kunne ikke fjernes' in dialogs[-1]
                 page.evaluate('() => {Storage.prototype.setItem=window.realSetItem}')
-                card('Bein + lett kondisjon').get_by_role('button', name='Fjern', exact=True).click()
-                card('HYROX + løping').get_by_role('button', name='Fjern', exact=True).click()
-                card('Intervaller').get_by_role('button', name='Fjern', exact=True).click()
+                plan_action(page, card('Bein + lett kondisjon'), 'Fjern').click()
+                plan_action(page, card('HYROX + løping'), 'Fjern').click()
+                plan_action(page, card('Intervaller'), 'Fjern').click()
                 assert page.locator('#planCards .workout-card').count() == 0
                 assert 'Ingen aktive økter' in page.locator('#planCards').text_content()
                 page.reload(); nav('Logg')
