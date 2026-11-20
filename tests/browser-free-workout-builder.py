@@ -5,6 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 from playwright.sync_api import sync_playwright
+from browser_plan_helpers import plan_action
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -57,7 +58,7 @@ def main():
                 strength_id = page.evaluate('data.workouts.at(-1).id')
                 assert card('Min styrke').count() == 1
                 assert page.locator('#logType option').count() == 5
-                page.reload(); nav('Plan'); card('Min styrke').get_by_role('button', name='Logg', exact=True).click()
+                page.reload(); nav('Plan'); card('Min styrke').get_by_role('button', name='Logg økt', exact=True).click()
                 assert page.locator('#logType').input_value() == strength_id
                 assert page.locator('.log-entry').count() == 3
                 page.get_by_text('✓ Marker alle sett utført', exact=True).click()
@@ -75,7 +76,7 @@ def main():
                 interval_id = page.evaluate('data.workouts.at(-1).id')
                 assert interval_id not in ['interval', strength_id]
                 assert page.evaluate('data.workouts.filter(w=>w.day===1).length') == 3
-                card('Mine intervaller').get_by_role('button', name='Logg', exact=True).click()
+                card('Mine intervaller').get_by_role('button', name='Logg økt', exact=True).click()
                 assert page.locator('#logType').input_value() == interval_id
                 assert page.locator('#l4-1-0-value').input_value() == '4:48'
                 assert page.locator('#l4-1-0-qty').input_value() == '4:00'
@@ -83,7 +84,7 @@ def main():
                 page.locator('.log-save-bar .btn').last.click()
                 history_id = page.evaluate('data.logs.at(-1).id')
                 history = page.evaluate('structuredClone(data.logs.at(-1))')
-                nav('Plan'); card('Mine intervaller').get_by_role('button', name='Rediger', exact=True).click()
+                nav('Plan'); plan_action(page, card('Mine intervaller'), 'Rediger').click()
                 assert page.locator('#editMode').is_disabled()
                 page.locator('.interval-row').nth(1).get_by_role('button', name='Slett del', exact=True).click()
                 page.locator('#editTitle').fill('Mine intervaller endret'); save()
@@ -98,7 +99,7 @@ def main():
                 for index, value in [(0, 'Eget løp'), (1, '4 × 1 km'), (2, '4'), (3, 'km')]:
                     inputs.nth(index).fill(value); inputs.nth(index).press('Tab')
                 save()
-                card('Min HYROX og løping').get_by_role('button', name='Logg', exact=True).click()
+                card('Min HYROX og løping').get_by_role('button', name='Logg økt', exact=True).click()
                 assert page.locator('#l4-0-0-value').input_value() == '1'
                 page.get_by_text('✓ Marker alle sett utført', exact=True).click()
                 page.locator('.log-save-bar .btn').last.click()

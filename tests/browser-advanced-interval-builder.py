@@ -5,6 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 from playwright.sync_api import sync_playwright
+from browser_plan_helpers import plan_action
 
 ROOT = Path(__file__).resolve().parents[1]
 class Handler(SimpleHTTPRequestHandler):
@@ -69,7 +70,7 @@ def main():
                 assert page.evaluate('editedWorkout().exercises[2].intervalPlan.speedKmh')==3600/330
                 row(2).get_by_role('button',name='Slett del',exact=True).click()
                 save();workout_id=page.evaluate('data.workouts.at(-1).id')
-                card('Avansert distanse').get_by_role('button',name='Logg',exact=True).click()
+                card('Avansert distanse').get_by_role('button',name='Logg økt', exact=True).click()
                 assert page.locator('#l4-0-0-value').input_value()=='1'
                 assert page.locator('#l4-0-0-qty').input_value()==''
                 assert '1 km' in page.locator('.log-ex-title small').first.text_content()
@@ -86,7 +87,7 @@ def main():
                 page.reload();history()
                 assert page.locator('#l4-0-0-value').input_value()=='0.95'
                 assert page.locator('#l4-0-0-qty').input_value()=='5:30'
-                nav('Plan');card('Avansert distanse').get_by_role('button',name='Rediger',exact=True).click()
+                nav('Plan');plan_action(page, card('Avansert distanse'), 'Rediger').click()
                 row(0).get_by_role('button',name='Slett del',exact=True).click();save()
                 assert page.evaluate('data.logs.at(-1)')==saved
                 history();assert page.locator('#l4-0-0-value').input_value()=='0.95'

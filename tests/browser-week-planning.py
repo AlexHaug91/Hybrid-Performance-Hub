@@ -5,6 +5,7 @@ from http.server import SimpleHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 from playwright.sync_api import sync_playwright
+from browser_plan_helpers import plan_action
 ROOT=Path(__file__).resolve().parents[1]
 class Handler(SimpleHTTPRequestHandler):
     def log_message(self,*args): pass
@@ -25,16 +26,16 @@ def main():
                 def card(title): return page.locator('#planCards .workout-card').filter(has_text=title)
                 def row(occurrence): return page.locator(f'#planCards [data-occurrence-id="{occurrence}"]')
                 def week_move(target,day):
-                    target.get_by_role('button',name='Flytt denne uken',exact=True).click()
+                    plan_action(page, target, 'Flytt denne uken').click()
                     assert page.locator('#weekScope').input_value()=='week'
                     page.locator('#weekDay').select_option(str(day))
                     page.get_by_role('button',name='Lagre planendring',exact=True).click()
                 original_templates=page.evaluate('structuredClone(data.workouts)')
-                nav('Plan');card('Overkropp + rolig løp').get_by_role('button',name='Logg',exact=True).click()
+                nav('Plan');card('Overkropp + rolig løp').get_by_role('button',name='Logg økt', exact=True).click()
                 page.locator('#l4-0-0-value').fill('75');page.locator('.log-entry-controls .mark').first.click()
                 page.locator('.log-save-bar .btn').first.click();page.locator('#logNotes').fill('Kladd før arkivering')
                 history=page.evaluate('structuredClone(data.logs[0])')
-                nav('Plan');card('Overkropp + rolig løp').get_by_role('button',name='Fjern',exact=True).click()
+                nav('Plan');plan_action(page, card('Overkropp + rolig løp'), 'Fjern').click()
                 assert page.locator('#archiveCard').is_visible()
                 drafts=page.evaluate('JSON.stringify(logDrafts)')
                 page.locator('#archiveList select').select_option('2')
@@ -50,10 +51,10 @@ def main():
                 assert page.evaluate("data.workouts.find(w=>w.id==='interval').day")==1
                 page.locator('.weeknav button').last.click();assert 'MAN' in card('Intervaller').text_content()
                 page.locator('.weeknav button').first.click();assert 'TOR' in card('Intervaller').text_content()
-                card('HYROX + løping').get_by_role('button',name='Hopp over denne uken',exact=True).click()
-                assert card('HYROX + løping').get_by_role('button',name='Logg',exact=True).is_disabled()
+                plan_action(page, card('HYROX + løping'), 'Hopp over denne uken').click()
+                assert card('HYROX + løping').get_by_role('button',name='Logg økt', exact=True).is_disabled()
                 assert not page.evaluate("!!data.workouts.find(w=>w.id==='hyrox').archived")
-                card('HYROX + løping').get_by_role('button',name='Ta med igjen',exact=True).click()
+                plan_action(page, card('HYROX + løping'), 'Ta med igjen').click()
                 week_move(card('Overkropp + rolig løp'),4)
                 extras=[]
                 for _ in range(2):
@@ -62,22 +63,22 @@ def main():
                     page.get_by_role('button',name='Lagre planendring',exact=True).click()
                     extras=page.locator('#planCards .workout-card').filter(has_text='Ekstra · kun denne uken').evaluate_all('(rows)=>rows.map(r=>r.dataset.occurrenceId)')
                 assert len(set(extras))==2
-                row(extras[0]).get_by_role('button',name='Logg',exact=True).click()
+                row(extras[0]).get_by_role('button',name='Logg økt', exact=True).click()
                 page.locator('#l4-0-0-value').fill('70');page.locator('#logNotes').fill('Ekstra A')
-                nav('Plan');row(extras[1]).get_by_role('button',name='Logg',exact=True).click()
+                nav('Plan');row(extras[1]).get_by_role('button',name='Logg økt', exact=True).click()
                 page.locator('#l4-0-0-value').fill('80');page.locator('#logNotes').fill('Ekstra B')
-                nav('Plan');row(extras[0]).get_by_role('button',name='Logg',exact=True).click()
+                nav('Plan');row(extras[0]).get_by_role('button',name='Logg økt', exact=True).click()
                 assert page.locator('#logNotes').input_value()=='Ekstra A'
                 assert page.locator('#l4-0-0-value').input_value()=='70'
                 page.locator('.log-entry-controls .mark').first.click();page.locator('.log-save-bar .btn').first.click()
                 a=page.evaluate('structuredClone(data.logs.at(-1))')
-                nav('Plan');row(extras[1]).get_by_role('button',name='Logg',exact=True).click()
+                nav('Plan');row(extras[1]).get_by_role('button',name='Logg økt', exact=True).click()
                 assert page.locator('#l4-0-0-value').input_value()=='80'
                 page.locator('.log-entry-controls .mark').first.click();page.locator('.log-save-bar .btn').last.click()
                 assert page.evaluate('data.logs.length')==3
                 assert page.evaluate('data.logs[0]')==history
                 nav('Plan');week_move(row(extras[0]),5)
-                row(extras[0]).get_by_role('button',name='Logg',exact=True).click()
+                row(extras[0]).get_by_role('button',name='Logg økt', exact=True).click()
                 assert page.evaluate('logEditingId')==a['id']
                 assert page.locator('#logDate').input_value()==a['date']
                 page.locator('#logNotes').fill('Ekstra A bevart kladd')
@@ -89,10 +90,10 @@ def main():
                 assert page.locator('#toast').text_content()=='Data importert'
                 page.reload();nav('Plan')
                 assert 'FRE' in row(extras[0]).text_content()
-                row(extras[0]).get_by_role('button',name='Logg',exact=True).click()
+                row(extras[0]).get_by_role('button',name='Logg økt', exact=True).click()
                 assert page.locator('#logNotes').input_value()=='Ekstra A bevart kladd'
                 assert page.evaluate('logEditingId')==a['id']
-                nav('Plan');card('Intervaller').get_by_role('button',name='Flytt denne uken',exact=True).click()
+                nav('Plan');plan_action(page, card('Intervaller'), 'Flytt denne uken').click()
                 page.locator('#weekDay').select_option('6');before=page.evaluate('JSON.stringify(data)')
                 page.evaluate("""() => {window.originalSetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='hyrox_performance_hub_v1')throw new DOMException('Full','QuotaExceededError');return window.originalSetItem.call(this,k,v)}}""")
                 page.get_by_role('button',name='Lagre planendring',exact=True).click()
