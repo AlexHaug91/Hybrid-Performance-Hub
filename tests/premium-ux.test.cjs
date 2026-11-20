@@ -74,3 +74,37 @@ test('translated menus preserve the original occurrence action keys',()=>{
 test('unknown text and custom interval names never resolve inherited catalogue properties',()=>{
  const a=setup();a.run('uiLanguage="en"');for(const value of ['constructor','toString','Mine økter']){a.context.value=value;if(value!=='Mine økter')assert.equal(a.run('t(value)'),value);assert.equal(a.run('intervalRoleName(value)'),value)}
 });
+function todayPlan(a,date='2026-11-18'){
+ a.context.date=date;a.run('data.workouts.forEach(w=>w.day=1);data.weekPlans={"2026-11-16":{overrides:{upper:{day:3}},extras:[{id:"extra-today-a",workoutId:"upper",day:3},{id:"extra-today-b",workoutId:"upper",day:3}]}}');
+ return a.snapshot('todayOccurrences(date)');
+}
+test('today uses real weekly overrides and independent same-day extras without changing templates',()=>{
+ const a=setup(),occ=todayPlan(a);assert.deepEqual(occ.map(o=>o.id),['repeat:2026-11-16:upper','extra-today-a','extra-today-b']);assert.equal(a.snapshot('data.workouts.find(w=>w.id==="upper").day'),1);assert.equal(a.snapshot('todayOccurrences("2026-11-25").length'),0);
+});
+test('today retains a skipped occurrence as disabled and does not start it',()=>{
+ const a=setup();todayPlan(a);a.run('data.weekPlans["2026-11-16"].extras[0].skipped=true');assert.equal(a.snapshot('todaySession(todayOccurrences(date)[1]).status'),'skipped');
+});
+test('today associates exact log IDs with extras rather than another same-day session',()=>{
+ const a=setup();todayPlan(a);a.run('data.logs=[{id:"saved-a",type:"upper",date,occurrenceId:"extra-today-a",status:"partial",updated:100},{id:"saved-b",type:"upper",date,occurrenceId:"extra-today-b",status:"complete",updated:200}]');assert.deepEqual(a.snapshot('todayOccurrences(date).map(todaySession)'),[{status:'planned'},{status:'partial',logId:'saved-a'},{status:'complete',logId:'saved-b'}]);
+});
+test('today matches an older unbound log only to the recurring occurrence',()=>{
+ const a=setup();todayPlan(a);a.run('data.logs=[{id:"legacy",type:"upper",date,status:"complete"}]');assert.equal(a.snapshot('todaySession(todayOccurrences(date)[0]).logId'),'legacy');assert.equal(a.snapshot('todaySession(todayOccurrences(date)[1]).status'),'planned');
+});
+test('today resumes occurrence drafts after movement without rewriting their original date',()=>{
+ const a=setup();todayPlan(a);a.run('logDrafts={"old-date-key":{editingId:null,updated:500,state:{type:"upper",date:"2026-11-17",occurrenceId:"extra-today-a"}}}');assert.deepEqual(a.snapshot('todaySession(todayOccurrences(date)[1])'),{status:'draft',draftKey:'old-date-key'});assert.equal(a.snapshot('logDrafts["old-date-key"].state.date'),'2026-11-17');
+});
+test('today does not let a stale draft hide a more recent completed log',()=>{
+ const a=setup();todayPlan(a);a.run('data.logs=[{id:"done",type:"upper",date,occurrenceId:"extra-today-a",updated:200,status:"complete"}];logDrafts={stale:{editingId:null,updated:100,state:{type:"upper",date,occurrenceId:"extra-today-a"}}}');assert.equal(a.snapshot('todaySession(todayOccurrences(date)[1]).status'),'complete');
+});
+test('archived templates disappear from today without deleting any existing logs or drafts',()=>{
+ const a=setup();todayPlan(a);a.run('data.workouts.find(w=>w.id==="upper").archived=true;data.logs=[{id:"keep"}];logDrafts={keep:{state:{type:"upper"}}}');assert.equal(a.snapshot('todayOccurrences(date).length'),0);assert.equal(a.snapshot('data.logs[0].id'),'keep');assert.equal(a.snapshot('Object.keys(logDrafts)[0]'),'keep');
+});
+test('today rendering and session lookup are read-only in both languages',()=>{
+ const a=setup(),before=a.snapshot('data');a.run('renderTodayWorkouts();uiLanguage="en";renderTodayWorkouts()');assert.deepEqual(a.snapshot('data'),before);assert.equal(a.storage.size,0);assert.match(a.fields.get('todayWorkouts').innerHTML,/Start workout|No workouts planned today/);
+});
+for(const [session,expected] of [[{status:'planned'},['quick','upper','2026-11-18','extra-today-a']],[{status:'draft',draftKey:'draft-a'},['draft','draft-a']],[{status:'complete',logId:'historical-a'},['log','historical-a']]])test(`today ${session.status} opens the exact existing handler without generating a second log`,()=>{
+ const a=setup();a.context.session=session;a.run('todayOccurrences=()=>[{id:"extra-today-a",workoutId:"upper",date:"2026-11-18",skipped:false}];todaySession=()=>session;quickLog=(...args)=>globalThis.opened=["quick",...args];resumeArchivedDraft=key=>globalThis.opened=["draft",key];editSavedLog=id=>globalThis.opened=["log",id];startTodayWorkout("extra-today-a")');assert.deepEqual(a.snapshot('opened'),expected);assert.equal(a.snapshot('data.logs.length'),0);
+});
+test('today completed sessions stay matched after moving their occurrence date',()=>{
+ const a=setup();todayPlan(a);a.run('data.logs=[{id:"moved-complete",type:"upper",date:"2026-11-17",occurrenceId:"extra-today-a",status:"complete"}]');assert.equal(a.snapshot('todaySession(todayOccurrences(date)[1]).logId'),'moved-complete');assert.equal(a.snapshot('data.logs[0].date'),'2026-11-17');
+});

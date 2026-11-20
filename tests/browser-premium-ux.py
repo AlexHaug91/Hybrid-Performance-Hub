@@ -83,8 +83,62 @@ def main():
                 assert 'Could not save the language preference' in dialogs[-1]
                 assert page.evaluate('JSON.stringify(data)')==before
                 page.evaluate('() => {Storage.prototype.setItem=window.realSet}')
+                # Today's card uses occurrence IDs, including two extras of one template.
+                page.evaluate('''id => {
+                    const now=new Date(),week=iso(startWeek(now)),day=now.getDay();
+                    data.weekPlans={[week]:{overrides:Object.fromEntries(data.workouts.map(w=>[w.id,{day:(day+1)%7}])),extras:[{id:'extra-today-a',workoutId:id,day},{id:'extra-today-b',workoutId:id,day}]}};
+                    persist();renderAll();
+                }''',own_id)
+                nav('Overview')
+                def today(occ):return page.locator(f'#todayWorkouts [data-today-occurrence="{occ}"]')
+                assert page.locator('#todayWorkouts .today-workout').count()==2
+                today('extra-today-a').get_by_role('button',name='Start workout',exact=True).click()
+                assert page.evaluate('logState.occurrenceId')=='extra-today-a'
+                assert page.locator('#logDate').input_value()==page.evaluate('iso(new Date())')
+                page.locator('#l4-0-0-value').fill('70');page.locator('#logNotes').fill('Draft A')
+                nav('Overview');page.reload()
+                today('extra-today-a').get_by_role('button',name='Continue workout',exact=True).click()
+                assert page.locator('#l4-0-0-value').input_value()=='70'
+                assert page.locator('#logNotes').input_value()=='Draft A'
+                assert page.evaluate('countLog().done')==0
+                nav('Overview');today('extra-today-b').get_by_role('button',name='Start workout',exact=True).click()
+                assert page.locator('#logNotes').input_value()==''
+                page.locator('#l4-0-0-value').fill('80');page.locator('.log-entry-controls .mark').first.click()
+                page.locator('#savePartialButton').click();partial_id=page.evaluate('logEditingId')
+                nav('Overview');today('extra-today-a').get_by_role('button',name='Continue workout',exact=True).click()
+                assert page.locator('#l4-0-0-value').input_value()=='70'
+                page.locator('.log-entry-controls .mark').first.click();page.locator('#saveCompleteButton').click()
+                complete_id=page.evaluate('logEditingId');saved_logs=page.evaluate('structuredClone(data.logs)')
+                nav('Overview');today('extra-today-a').get_by_role('button',name='View workout',exact=True).click()
+                assert page.evaluate('logEditingId')==complete_id
+                nav('Overview');today('extra-today-b').get_by_role('button',name='Continue workout',exact=True).click()
+                assert page.evaluate('logEditingId')==partial_id
+                assert page.locator('#l4-0-0-value').input_value()=='80'
+                nav('Plan')
+                row_b=page.locator('#planCards .workout-card[data-occurrence-id="extra-today-b"]')
+                row_b.locator('.plan-menu-toggle').click();page.locator('#planActionDialog').get_by_role('button',name='Skip this week',exact=True).click()
+                nav('Overview');assert today('extra-today-b').get_by_role('button',name='Start workout',exact=True).is_disabled()
+                assert page.evaluate('data.logs')==saved_logs
+                nav('Plan');row_b.locator('.plan-menu-toggle').click();page.locator('#planActionDialog').get_by_role('button',name='Include again',exact=True).click()
+                row_a=page.locator('#planCards .workout-card[data-occurrence-id="extra-today-a"]')
+                row_a.locator('.plan-menu-toggle').click();page.locator('#planActionDialog').get_by_role('button',name='Move this week',exact=True).click()
+                page.locator('#weekDay').select_option(str(page.evaluate('(new Date().getDay()+1)%7')))
+                page.get_by_role('button',name='Save plan change',exact=True).click()
+                nav('Overview');assert today('extra-today-a').count()==0
+                assert today('extra-today-b').get_by_role('button',name='Continue workout',exact=True).is_enabled()
+                assert page.evaluate('data.logs')==saved_logs
+                # Archiving the template preserves both completed and ongoing sessions.
+                nav('Plan')
+                own_template=page.locator('#planCards .workout-card[data-occurrence-id^="repeat:"]').filter(has_text='Ny økt')
+                own_template.locator('.plan-menu-toggle').click();page.locator('#planActionDialog').get_by_role('button',name='Remove from plan',exact=True).click()
+                assert page.evaluate('data.logs')==saved_logs
+                nav('Overview');assert page.locator('#todayWorkouts .today-workout').count()==0
+                nav('Plan');page.locator('#archiveList').get_by_role('button',name='Restore',exact=True).click()
+                assert page.evaluate('data.logs')==saved_logs
+                nav('Overview');assert today('extra-today-b').count()==1
+                assert not page.evaluate('document.documentElement.scrollWidth>innerWidth+1')
                 assert not errors,errors
-                print(f'PASS {width}x{height}: live language/reload, all pages, unchanged own text/models/drafts, partial history, JSON/failed import, preference storage failure; no JS errors')
+                print(f'PASS {width}x{height}: live language/reload, all pages, unchanged own text/models/drafts, partial history, JSON/failed import, preference storage failure, today/occurrence/draft/partial/completed/skip/move/archive/restore; no JS errors')
                 context.close()
             browser.close()
     finally:server.shutdown();server.server_close()
