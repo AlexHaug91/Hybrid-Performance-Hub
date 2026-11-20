@@ -108,3 +108,42 @@ for(const [session,expected] of [[{status:'planned'},['quick','upper','2026-11-1
 test('today completed sessions stay matched after moving their occurrence date',()=>{
  const a=setup();todayPlan(a);a.run('data.logs=[{id:"moved-complete",type:"upper",date:"2026-11-17",occurrenceId:"extra-today-a",status:"complete"}]');assert.equal(a.snapshot('todaySession(todayOccurrences(date)[1]).logId'),'moved-complete');assert.equal(a.snapshot('data.logs[0].date'),'2026-11-17');
 });
+function priorStrength(a){
+ a.run('logState=buildLogState("2026-11-18","upper");data.logs=[{id:"old",type:"upper",date:"2026-11-17",status:"complete",title:"Previous",notes:"",rpe:null,duration:null,created:100,exercises:logState.items.map(item=>({...summarizeExercise(item),sets:item.entries.map((e,i)=>({done:true,skipped:false,value:70+i,qty:8-i}))}))}];logKey="2026-11-18|upper";document.getElementById("logDate").value=logState.date;document.getElementById("logType").value=logState.type;renderLogUI()');
+}
+test('previous strength values are explicit, editable and never mark any set completed',()=>{
+ const a=setup();priorStrength(a);const old=a.snapshot('data.logs');assert.equal(a.snapshot('previousValues(logState.items[0],0).value'),'70');a.run('applyPreviousSuggestion(0)');assert.equal(a.snapshot('logState.items[0].entries[0].value'),'70');assert.equal(a.snapshot('countLog().done'),0);assert.deepEqual(a.snapshot('data.logs'),old);a.fields.get('l4-0-0-value').value='75.5';a.run('captureLogState()');assert.equal(a.snapshot('logState.items[0].entries[0].value'),'75.5');
+});
+test('suggestions leave completed and skipped sets untouched',()=>{
+ const a=setup();priorStrength(a);a.run('logState.items[0].entries[0]={done:true,skipped:false,value:"88",qty:"6"};logState.items[0].entries[1]={done:false,skipped:true,value:"99",qty:"5"};renderLogUI();applyPreviousSuggestion(0)');assert.deepEqual(a.snapshot('logState.items[0].entries.slice(0,2)'),[{done:true,skipped:false,value:'88',qty:'6'},{done:false,skipped:true,value:'99',qty:'5'}]);assert.equal(a.snapshot('logState.items[0].entries[2].value'),'72');
+});
+test('changed units never become proposals or automatic previous-weight prefills',()=>{
+ const a=setup();priorStrength(a);a.run('data.logs[0].exercises[0].unit="km"');assert.equal(a.snapshot('previousValues(logState.items[0],0)'),null);assert.equal(a.snapshot('lastValue(data.logs[0],0,data.workouts.find(w=>w.id==="upper").exercises[0])'),null);
+});
+test('duplicate strength names are rejected when the prior exercise is ambiguous',()=>{
+ const a=setup();priorStrength(a);a.run('data.logs[0].exercises.push(structuredClone(data.logs[0].exercises[0]))');assert.equal(a.snapshot('previousValues(logState.items[0],0)'),null);
+});
+test('historical editing never applies new previous-result suggestions',()=>{
+ const a=setup();priorStrength(a);a.run('logEditingId="old"');const before=a.snapshot('logState');a.run('applyPreviousSuggestion(0)');assert.equal(a.snapshot('previousValues(logState.items[0],0)'),null);assert.deepEqual(a.snapshot('logState'),before);
+});
+test('no completed history means no suggested values',()=>{
+ const a=setup();priorStrength(a);a.run('data.logs[0].status="partial"');assert.equal(a.snapshot('previousValues(logState.items[0],0)'),null);
+});
+test('draft status, failure and retry are per-session and add no fields to the backup',()=>{
+ const a=setup();priorStrength(a);a.run('logDraftPersist()');assert.equal(a.snapshot('logSaveStates.get(logKey).status'),'draft');a.blocked.add(DRAFTS);a.run('logState.notes="Retained";logDraftPersist()');assert.equal(a.snapshot('logSaveStates.get(logKey).memoryOnly'),true);assert.equal(a.snapshot('logDrafts[logKey].state.notes'),'Retained');a.blocked.clear();a.run('logDraftPersist()');assert.equal(a.snapshot('logSaveStates.get(logKey).status'),'draft');assert.equal(a.snapshot('logSaveStates.get(logKey).memoryOnly'),false);assert.ok(!a.storage.get(DRAFTS).includes('memoryOnly'));a.run('validateBackup({...data,draftsV4:logDrafts})');
+});
+test('beforeunload warns only for changes that are still in memory',()=>{
+ const a=setup();priorStrength(a);a.run('globalThis.prevented=false;globalThis.event={preventDefault(){globalThis.prevented=true}};setLogSaveState("error","draft");guardUnsavedDrafts(event)');assert.equal(a.run('prevented'),true);a.run('prevented=false;logDraftPersist();guardUnsavedDrafts(event)');assert.equal(a.run('prevented'),false);
+});
+test('failed main save shows an error while preserving the draft and original history',()=>{
+ const a=setup();priorStrength(a);a.fields.get('logNotes').value='Failed save';a.run('logState.items[0].entries[0].done=true;renderLogUI()');const before=a.snapshot('data.logs');a.blocked.add(MAIN);a.run('saveLog("partial")');assert.deepEqual(a.snapshot('data.logs'),before);assert.equal(a.snapshot('logSaveStates.get(logKey).status'),'error');assert.equal(a.snapshot('logSaveStates.get(logKey).kind'),'main');assert.equal(a.snapshot('logSaveStates.get(logKey).memoryOnly'),false);a.blocked.clear();a.run('saveLog("partial")');assert.equal(a.snapshot('data.logs.length'),2);assert.equal(a.snapshot('logSaveStates.get(logKey).status'),'saved');
+});
+test('interval suggestions preserve canonical distance, time and clock pace',()=>{
+ const a=setup();a.run('data.workouts[0].exercises=[makeIntervalPart("Intervall",{basis:"distance",meters:400,seconds:null,speedKmh:3600/330,speedUnit:"min/km",distanceUnit:"m",timeUnit:"min"})];logState=buildLogState("2026-11-18","interval");logKey="2026-11-18|interval";logState.items[0].entries[0]={value:"0.39",qty:String(130/60),done:true,skipped:false};data.logs=[{id:"old",type:"interval",date:"2026-11-17",status:"complete",exercises:logState.items.map(summarizeExercise)}];logState=buildLogState("2026-11-18","interval");renderLogUI();applyPreviousSuggestion(0)');assert.equal(a.snapshot('logState.items[0].entries[0].value'),'0.39');assert.equal(a.snapshot('logState.items[0].entries[0].qty'),String(130/60));assert.equal(a.snapshot('countLog().done'),0);assert.match(a.run('previousSuggestionText(logState.items[0],0)'),/390 m · 2:10/);assert.equal(a.snapshot('data.logs[0].exercises[0].sets[0].actual.meters'),390);
+});
+test('a changed interval amount is not comparable with an old planned distance',()=>{
+ const a=setup();a.run('logState=buildLogState("2026-11-18","interval");data.logs=[{id:"old",type:"interval",date:"2026-11-17",status:"complete",exercises:logState.items.map(summarizeExercise)}];data.logs[0].exercises[1].dose="2"');assert.equal(a.snapshot('previousValues(logState.items[1],1)'),null);
+});
+test('the previous-result summary never labels a value using a different current unit',()=>{
+ const a=setup();priorStrength(a);a.run('data.logs[0].exercises[0].unit="kg/hånd"');assert.equal(a.run('priorSummary(data.logs[0],0,logState.items[0])'),'Ingen sammenlignbare tidligere resultater');
+});

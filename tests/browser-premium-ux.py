@@ -137,8 +137,97 @@ def main():
                 assert page.evaluate('data.logs')==saved_logs
                 nav('Overview');assert today('extra-today-b').count()==1
                 assert not page.evaluate('document.documentElement.scrollWidth>innerWidth+1')
+                # Previous-result suggestions remain optional and editable for a new session.
+                nav('Log');page.locator('#logType').select_option(own_id)
+                tomorrow=page.evaluate('iso(addDays(new Date(),1))')
+                page.locator('#logDate').fill(tomorrow);page.locator('#logDate').press('Tab')
+                assert page.evaluate('logEditingId') is None
+                assert page.evaluate('countLog().done')==0
+                suggestion=page.locator('.log-suggestion').first
+                assert '70 kg' in suggestion.inner_text()
+                suggestion.get_by_role('button',name='Use previous result',exact=True).click()
+                assert page.locator('#l4-0-0-value').input_value()=='70'
+                assert page.evaluate('countLog().done')==0
+                page.locator('#l4-0-0-value').fill('75.5');page.locator('.log-entry-controls .mark').first.click()
+                page.locator('.log-entry-controls .skip').nth(1).click()
+                suggestion.get_by_role('button',name='Use previous result',exact=True).click()
+                assert page.locator('#l4-0-0-value').input_value()=='75.5'
+                assert page.evaluate('countLog().done')==1 and page.evaluate('countLog().skipped')==1
+                assert page.locator('#logSaveStatus').get_attribute('data-save-state')=='draft'
+                main_before=page.evaluate('JSON.stringify(data.logs)')
+                stored_draft=page.evaluate('localStorage.getItem(DRAFT_KEY)')
+                page.evaluate('''() => {window.realSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='hyrox_performance_hub_v4_drafts')throw Error('Full');return window.realSet.call(this,k,v)}}''')
+                page.locator('#l4-0-0-value').fill('76')
+                assert page.locator('#logSaveStatus').get_attribute('data-save-state')=='error'
+                assert 'Unsaved changes' in page.locator('#logSaveStatus').text_content()
+                assert page.evaluate('localStorage.getItem(DRAFT_KEY)')==stored_draft
+                assert page.evaluate('''() => {let warned=false;guardUnsavedDrafts({preventDefault(){warned=true}});return warned}''')
+                nav('Plan');nav('Log');assert page.locator('#l4-0-0-value').input_value()=='76'
+                page.evaluate('() => {Storage.prototype.setItem=window.realSet}')
+                page.locator('#l4-0-0-value').fill('77')
+                assert page.locator('#logSaveStatus').get_attribute('data-save-state')=='draft'
+                assert not page.evaluate('''() => {let warned=false;guardUnsavedDrafts({preventDefault(){warned=true}});return warned}''')
+                page.evaluate('''() => {window.realSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='hyrox_performance_hub_v1')throw Error('Full');return window.realSet.call(this,k,v)}}''')
+                page.locator('#savePartialButton').click()
+                assert page.locator('#logSaveStatus').get_attribute('data-save-state')=='error'
+                assert 'draft is saved on this device' in page.locator('#logSaveStatus').text_content()
+                assert page.evaluate('JSON.stringify(data.logs)')==main_before
+                page.reload();nav('Plan')
+                page.locator('#archivedDrafts .session-details').filter(has_text='Ny økt').get_by_role('button',name='Resume draft',exact=True).click()
+                assert page.locator('#logDate').input_value()==tomorrow
+                assert page.locator('#l4-0-0-value').input_value()=='77'
+                assert page.evaluate('countLog().done')==1 and page.evaluate('countLog().skipped')==1
+                page.locator('#savePartialButton').click()
+                assert page.locator('#logSaveStatus').get_attribute('data-save-state')=='saved'
+                new_id=page.evaluate('logEditingId');assert new_id not in {complete_id,partial_id}
+                assert page.evaluate('data.logs.filter(l=>l.id!==logEditingId)')==json.loads(main_before)
+                # Editing a historical record changes only its own unique ID; suggestions are absent.
+                page.locator(f'#logHistory button[onclick="editSavedLog(\'{complete_id}\')"]').click()
+                assert page.locator('.log-suggestion').count()==0
+                others=page.evaluate('data.logs.filter(l=>l.id!==logEditingId)')
+                page.locator('#logNotes').fill('Edited history safely');page.locator('#saveCompleteButton').click()
+                assert page.evaluate('logEditingId')==complete_id
+                assert page.evaluate('data.logs.filter(l=>l.id!==logEditingId)')==others
+                # SI distance intervals work with English builder labels and actual meter/time inputs.
+                nav('Plan');page.get_by_role('button',name='New workout',exact=True).click()
+                page.locator('#editTitle').fill('Distance quality');page.locator('#editMode').select_option('interval')
+                page.locator('#seqBasis').select_option('distance');page.locator('#seqCount').fill('2')
+                page.locator('#seqDistanceUnit').select_option('m');page.locator('#seqDistance').fill('400')
+                page.locator('#seqSpeedUnit').select_option('min/km');page.locator('#seqSpeed').fill('5:30')
+                page.locator('#seqPauseUnit').select_option('sec');page.locator('#seqPause').fill('90')
+                assert '4:24 work time' in page.locator('#seriesPreview').text_content()
+                page.get_by_role('button',name='+ Add series',exact=True).click()
+                page.get_by_role('button',name='✓ Save workout setup',exact=True).click()
+                page.locator('#planCards .workout-card').filter(has_text='Distance quality').get_by_role('button',name='Log workout',exact=True).click()
+                page.locator('#l4-0-0-value').fill('390');page.locator('#l4-0-0-qty').fill('2:10')
+                page.locator('.log-entry-controls .mark').first.click();page.locator('#saveCompleteButton').click()
+                interval_saved=page.evaluate('structuredClone(data.logs.at(-1))')
+                assert interval_saved['exercises'][0]['sets'][0]['actual']['meters']==390
+                assert interval_saved['exercises'][0]['sets'][0]['actual']['seconds']==130
+                page.locator('#logDate').fill(tomorrow);page.locator('#logDate').press('Tab')
+                assert page.locator('.log-suggestion').count()==1
+                page.locator('.log-suggestion').get_by_role('button',name='Use previous result',exact=True).click()
+                assert page.locator('#l4-0-0-value').input_value()=='390'
+                assert page.locator('#l4-0-0-qty').input_value()=='2:10'
+                assert page.evaluate('countLog().done')==0
+                page.locator('#l4-0-0-value').fill('395')
+                state_before=page.evaluate('JSON.stringify(logState)')
+                nav('Settings');page.locator('#languageChoice').select_option('nb');page.locator('#languageChoice').select_option('en')
+                assert page.evaluate('JSON.stringify(logState)')==state_before
+                with page.expect_download() as event:page.get_by_role('button',name='↓ Export all data (.json)',exact=True).click()
+                final_backup=Path(event.value.path()).read_bytes()
+                page.locator('#importFile').set_input_files({'name':'complete-premium.json','mimeType':'application/json','buffer':final_backup})
+                page.wait_for_function("!importBusy && document.getElementById('importFile').value === ''")
+                assert page.locator('#toast').text_content()=='Data imported'
+                assert page.evaluate('data.logs.at(-1)')==interval_saved
+                nav('Plan');page.locator('#archivedDrafts .session-details').filter(has_text='Distance quality').get_by_role('button',name='Resume draft',exact=True).click()
+                assert page.locator('#l4-0-0-value').input_value()=='395'
+                assert page.locator('#l4-0-0-qty').input_value()=='2:10'
+                assert page.evaluate('countLog().done')==0
+                assert not page.evaluate('document.documentElement.scrollWidth>innerWidth+1')
+                if width==393:page.screenshot(path='/tmp/hph-premium-complete-log-393.png')
                 assert not errors,errors
-                print(f'PASS {width}x{height}: live language/reload, all pages, unchanged own text/models/drafts, partial history, JSON/failed import, preference storage failure, today/occurrence/draft/partial/completed/skip/move/archive/restore; no JS errors')
+                print(f'PASS {width}x{height}: live language/reload, all pages, unchanged own text/models/drafts, partial history, JSON/failed import, preference storage failure, today/occurrence/draft/partial/completed/skip/move/archive/restore, optional suggestions, exact history, save-status/retry, SI intervals, combined JSON; no JS errors')
                 context.close()
             browser.close()
     finally:server.shutdown();server.server_close()
