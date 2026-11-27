@@ -137,7 +137,7 @@ def main():
     drafts=page.evaluate('Object.values(logDrafts).filter(d=>d.state.occurrenceId?.startsWith("extra-")).map(d=>({occ:d.state.occurrenceId,note:d.state.items[0].entries[0].hyroxInput.note}))')
     assert sorted(d['note'] for d in drafts)==['Extra 0','Extra 1']
     nav('Log');page.locator('#logHistory .log-history-item').filter(has_text='Mine HYROX-runder').get_by_role('button',name='Continue',exact=True).click()
-    assert 'HYROX Rounds' in page.locator('#logSessionBanner').text_content()
+    assert page.locator('#logSessionBanner strong').text_content()=='HYROX'
     if width==393:page.screenshot(path='/tmp/hyrox-logging-393.png',full_page=True)
     assert page.locator('#logExercises script').count()==0  # user comment remains inert text
     for label in ['Overview','Plan','Log','Progress','Road to Pro','Nutrition','Settings']:

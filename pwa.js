@@ -1,6 +1,6 @@
 'use strict';
 (() => {
- const RELEASE = 'hyrox-rounds-20261127-2';
+ const RELEASE = 'multiweek-20261127-1';
  const RETURN_KEY='hybrid_pwa_update_return',HELP_KEY='hybrid_pwa_transfer_help_seen';
  const formSelectors={nutrition:'#page-nutrition input,#page-nutrition textarea',settings:'[id^="setting"]',pro:'#proGoals input'};
  const baselines=new WeakMap();
@@ -20,7 +20,7 @@
   return false;
  }
  function standalone(){return window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}
- function hasData(){return data.logs.length>0||data.nutrition.length>0||data.pro.some(p=>p.current!==null)||Object.keys(logDrafts).length>0||Object.keys(data.weekPlans||{}).length>0||data.workouts.some(w=>!defaultWorkouts.some(original=>original.id===w.id))}
+ function hasData(){return (data.programs||[]).length>0||data.logs.length>0||data.nutrition.length>0||data.pro.some(p=>p.current!==null)||Object.keys(logDrafts).length>0||Object.keys(data.weekPlans||{}).length>0||data.workouts.some(w=>!defaultWorkouts.some(original=>original.id===w.id))}
  function reply(worker,type,extra={},timeout=4500){
   return new Promise((resolve,reject)=>{
    if(!worker){reject(Error('worker-unavailable'));return}
