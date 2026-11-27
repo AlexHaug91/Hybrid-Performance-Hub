@@ -1,6 +1,6 @@
 'use strict';
 (() => {
- const RELEASE = 'offline-pwa-20261120-1';
+ const RELEASE = 'hyrox-rounds-20261127-2';
  const RETURN_KEY='hybrid_pwa_update_return',HELP_KEY='hybrid_pwa_transfer_help_seen';
  const formSelectors={nutrition:'#page-nutrition input,#page-nutrition textarea',settings:'[id^="setting"]',pro:'#proGoals input'};
  const baselines=new WeakMap();
