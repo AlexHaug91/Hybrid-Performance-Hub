@@ -1,6 +1,6 @@
 'use strict';
 // Internal resource release only. The app's visible version and data schema do not change.
-const RELEASE = 'offline-pwa-20261120-1';
+const RELEASE = 'hyrox-rounds-20261127-2';
 const SCOPE = new URL(self.registration.scope);
 const CACHE_PREFIX = 'hybrid-shell:' + encodeURIComponent(SCOPE.href) + ':';
 const CACHE_NAME = CACHE_PREFIX + RELEASE;

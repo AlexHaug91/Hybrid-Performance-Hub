@@ -1,0 +1,74 @@
+const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const { join } = require('node:path');
+const { test } = require('node:test');
+const vm = require('node:vm');
+const script = readFileSync(join(__dirname, '..', 'index.html'), 'utf8').match(/<script>([\s\S]*)<\/script>/)[1].replace(/init\(\);\s*$/, '');
+const MAIN = 'hyrox_performance_hub_v1', DRAFTS = 'hyrox_performance_hub_v4_drafts';
+function setup(storage = new Map()) {
+  const fields = new Map(), alerts = [], toasts = [], blocked = new Set();let uuid=0;
+  const context = vm.createContext({
+    structuredClone, crypto: { randomUUID: () => 'test-id-'+(++uuid) },
+    localStorage: {
+      getItem: key => storage.get(key) ?? null,
+      setItem: (key, value) => { if (blocked.has(key)) throw Error('Blocked'); storage.set(key, value); },
+      removeItem: key => storage.delete(key),
+    },
+    document: {
+      getElementById: id => {
+        if (!fields.has(id)) fields.set(id, { value: '', innerHTML: '', textContent: '', style: { setProperty() {} }, disabled: false, classList: { add() {}, remove() {} }, scrollIntoView() {}, focus() {} });
+        return fields.get(id);
+      }, querySelector: () => null, querySelectorAll: () => [],
+    },
+    requestAnimationFrame: callback => callback(),
+    alert: message => alerts.push(message), confirm: () => true, recordToast: message => toasts.push(message),
+  });
+  vm.runInContext(script, context);
+  const run = code => vm.runInContext(code, context);
+  const snapshot = expr => JSON.parse(run(`JSON.stringify(${expr})`));
+  run(`
+    nav=()=>{};toast=recordToast;renderAll=()=>{};
+    renderLogUI=()=>{
+      for(const [id,key] of [['logRpe','rpe'],['logDuration','duration'],['logNotes','notes']])document.getElementById(id).value=logState[key];
+      logState.items.forEach((item,i)=>item.entries.forEach((entry,j)=>{if(item.hyrox)for(const key of ['meters','seconds','reps','kg','note'])document.getElementById('hr-'+i+'-'+j+'-'+key).value=entry.hyroxInput[key];for(const key of ['value','qty'])document.getElementById('l4-'+i+'-'+j+'-'+key).value=entry[key]}));
+    };
+  `);
+  function create(title = 'Egen styrke', day = 2, mode = 'mixed') {
+    run('createWorkout()');
+    fields.get('editTitle').value = title; fields.get('editDay').value = String(day);
+    fields.get('editLocation').value = 'Treningssenter'; fields.get('editFocus').value = 'Eget fokus'; fields.get('editDesc').value = 'Min beskrivelse';
+    context.chosenMode = mode; run('setWorkoutMode(chosenMode);addExercise()');
+    const id = snapshot('editing'); run('saveWorkout()'); return id;
+  }
+  function open(id, date = '2026-11-18') { context.selectedId = id; context.selectedDate = date; run('quickLog(selectedId,selectedDate)'); }
+  return { storage, fields, alerts, toasts, blocked, run, snapshot, context, create, open };
+}
+
+function rounds(count=4){const a=setup();a.run('createWorkout()');for(const [id,value]of [['editTitle','Min HYROX'],['editLocation','Studio'],['editFocus','Eget fokus'],['editDesc','Egen beskrivelse']])a.fields.get(id).value=value;a.run('setWorkoutMode("hyrox_rounds");hyroxQuickTemplate()');if(count!==4)a.run('setHyroxCount('+count+')');const id=a.snapshot('editing');a.run('saveWorkout()');assert.ok(a.snapshot('data.workouts').some(w=>w.id===id),a.alerts.join(';'));a.id=id;return a}
+function backup(a){return a.snapshot('({...data,draftsV4:logDrafts})')}
+function valid(a,payload=backup(a)){a.context.payload=structuredClone(payload);return a.run('validateBackup(payload)')}
+function value(a,i,key,raw,j=0){a.run(`document.getElementById('hr-${i}-${j}-${key}').value=${JSON.stringify(raw)};captureLogState()`)}
+function done(a,i,j=0){a.run(`toggleLogEntry(${i},${j},'done')`)}
+
+function editFirst(a,station){a.run('editWorkout(data.workouts.at(-1).id)');a.context.station=station;a.run('editedWorkout().exercises[0]=newHyroxPart(editedWorkout().hyroxRounds.rounds[0].id,station)');return a.snapshot('editedWorkout().exercises[0].hyrox.partId')}
+function change(a,id,station){a.context.partId=id;a.context.nextStation=station;return a.run('changeHyroxStation(partId,nextStation)')}
+function confirms(a,answer){const prompts=[];a.context.confirm=message=>{prompts.push(message);return answer};return prompts}
+
+test('native add and edit menus offer exactly the eleven requested station choices in both languages',()=>{const a=rounds(1);for(const lang of ['nb','en']){a.run('uiLanguage='+JSON.stringify(lang));const html=a.run('hyroxStationOptions("farmers")');assert.equal((html.match(/<option /g)||[]).length,11);assert.ok(!html.includes('value="rest"'));assert.match(html,/<option value="farmers" selected>/);assert.ok(html.includes(lang==='nb'?'Annen styrkeøvelse':'Other strength exercise'));assert.ok(html.includes(lang==='nb'?'Egendefinert øvelse':'Custom exercise'));assert.ok(a.run('hyroxBuilderPart(data.workouts.at(-1).exercises[0])').includes('onchange="changeHyroxStation('))}});
+for(const [station,fields]of Object.entries({run:['meters','seconds'],ski:['meters','seconds'],push:['meters','kg','seconds'],pull:['meters','kg','seconds'],burpees:['meters','reps','seconds'],row:['meters','seconds'],farmers:['meters','kg','seconds'],lunges:['meters','reps','kg','seconds'],wall:['reps','kg','seconds'],strength:['reps','kg','seconds'],custom:['meters','reps','kg','seconds']}))test(station+' exposes exactly its relevant measurement fields',()=>{const a=rounds(1);a.context.station=station;assert.deepEqual(a.snapshot('hyroxFields(newHyroxPart("round-test",station).hyrox)'),fields)});
+test('repeated station additions preserve unique IDs and independent plans',()=>{const a=rounds(1);a.run('editWorkout(data.workouts.at(-1).id);addHyroxPart(editedWorkout().hyroxRounds.rounds[0].id,"wall");addHyroxPart(editedWorkout().hyroxRounds.rounds[0].id,"wall")');const ex=a.snapshot('editedWorkout().exercises.slice(-2)');assert.notEqual(ex[0].hyrox.partId,ex[1].hyrox.partId);a.run('editedWorkout().exercises.at(-1).hyrox.plan.kg=6');assert.equal(a.snapshot('editedWorkout().exercises.at(-2).hyrox.plan.kg'),null)});
+test('changing an empty station preserves part and round identity and updates the default name',()=>{const a=rounds(1),id=editFirst(a,'ski'),before=a.snapshot('editedWorkout().exercises[0]'),prompts=confirms(a,false);assert.equal(change(a,id,'wall'),true);assert.equal(prompts.length,0);const ex=a.snapshot('editedWorkout().exercises[0]');assert.equal(ex.hyrox.partId,id);assert.equal(ex.hyrox.roundId,before.hyrox.roundId);assert.equal(ex.name,'Wall Balls');assert.equal(ex.hyrox.station,'wall')});
+test('compatible distance and time survive a station switch without a destructive confirmation',()=>{const a=rounds(1),id=editFirst(a,'run');a.run('editedWorkout().exercises[0].hyrox.plan.meters=500;editedWorkout().exercises[0].hyrox.plan.seconds=120');const prompts=confirms(a,false);assert.equal(change(a,id,'row'),true);assert.equal(prompts.length,0);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.meters'),500);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.seconds'),120)});
+test('cancelling a speed-target loss preserves every plan value and the selected station',()=>{const a=rounds(1),id=editFirst(a,'run');a.run('editedWorkout().exercises[0].hyrox.plan.speedKmh=12;editedWorkout().exercises[0].hyrox.plan.meters=1000');const before=a.snapshot('editedWorkout()'),prompts=confirms(a,false);assert.equal(change(a,id,'row'),false);assert.deepEqual(a.snapshot('editedWorkout()'),before);assert.equal(prompts.length,1);assert.ok(prompts[0].includes('12'));confirms(a,true);assert.equal(change(a,id,'row'),true);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.speedKmh'),null);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.meters'),1000)});
+for(const [from,to] of [['farmers','push'],['push','farmers']])test(from+' to '+to+' never reinterprets per-hand load as total load',()=>{const a=rounds(1),id=editFirst(a,from);a.run('editedWorkout().exercises[0].hyrox.plan.kg=24;editedWorkout().exercises[0].hyrox.plan.meters=40');const old=a.snapshot('editedWorkout()'),prompts=confirms(a,false);assert.equal(change(a,id,to),false);assert.deepEqual(a.snapshot('editedWorkout()'),old);assert.ok(prompts[0].includes('24'));confirms(a,true);assert.equal(change(a,id,to),true);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.kg'),null);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.meters'),40);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.loadBasis'),to==='farmers'?'per_hand':'total')});
+test('wall-ball and sandbag labels describe their load while retaining compatible total kg and reps',()=>{const a=rounds(1),id=editFirst(a,'wall');a.run('editedWorkout().exercises[0].hyrox.plan.kg=6;editedWorkout().exercises[0].hyrox.plan.reps=15');const prompts=confirms(a,false);assert.ok(a.run('hyroxBuilderPart(editedWorkout().exercises[0])').includes('Ballvekt (kg)'));assert.equal(change(a,id,'lunges'),true);assert.equal(prompts.length,0);assert.ok(a.run('hyroxBuilderPart(editedWorkout().exercises[0])').includes('Sandsekkvekt (kg)'));assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.kg'),6);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.reps'),15);a.run('saveWorkout()');valid(a)});
+test('custom names remain literal text across station and language changes',()=>{const a=rounds(1),id=editFirst(a,'custom');a.run('hyroxPlanChange(editedWorkout().exercises[0].hyrox.partId,"name","Min egen Løping <test>");uiLanguage="en"');assert.equal(change(a,id,'ski'),true);assert.equal(a.snapshot('editedWorkout().exercises[0].name'),'Min egen Løping <test>');assert.equal(a.run('hyroxName(editedWorkout().exercises[0])'),'Min egen Løping <test>');assert.ok(a.run('hyroxBuilderPart(editedWorkout().exercises[0])').includes('&lt;test&gt;'))});
+test('compatible unfinished clock input remains editable after switching exercise',()=>{const a=rounds(1),id=editFirst(a,'ski');a.context.partId=id;a.run('hyroxPlanChange(partId,"seconds","5:")');confirms(a,false);assert.equal(change(a,id,'row'),true);assert.equal(a.run('hyroxPlanErrors.get(partId+":seconds")'),'5:');const raw=a.storage.get(MAIN);a.run('saveWorkout()');assert.equal(a.storage.get(MAIN),raw);a.run('hyroxPlanChange(partId,"seconds","5:00");saveWorkout()');valid(a)});
+test('incompatible unfinished inputs cannot disappear until their removal is confirmed',()=>{const a=rounds(1),id=editFirst(a,'custom');a.context.partId=id;a.run('hyroxPlanChange(partId,"meters","invalid")');const prompts=confirms(a,false);assert.equal(change(a,id,'wall'),false);assert.equal(a.run('hyroxPlanErrors.get(partId+":meters")'),'invalid');assert.ok(prompts[0].includes('invalid'));confirms(a,true);assert.equal(change(a,id,'wall'),true);assert.equal(a.run('hyroxPlanErrors.has(partId+":meters")'),false);a.run('saveWorkout()');valid(a)});
+test('multi-set plans require confirmation before switching to a single-part station',()=>{const a=rounds(1),id=editFirst(a,'strength');a.run('editedWorkout().exercises[0].hyrox.plan.sets=3');confirms(a,false);assert.equal(change(a,id,'wall'),false);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.sets'),3);confirms(a,true);assert.equal(change(a,id,'wall'),true);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.plan.sets'),1);a.run('saveWorkout()');valid(a)});
+for(const station of ['burpees','lunges'])test(station+' repetitions and distance survive logging, restart and backup import',()=>{const a=rounds(1),id=editFirst(a,station);a.run('saveWorkout()');a.open(a.id);value(a,0,'meters','40');value(a,0,'reps','20');value(a,0,'seconds','1:30');done(a,0);a.run('saveLog("partial")');const saved=a.snapshot('data.logs[0]');assert.equal(saved.exercises[0].sets[0].hyroxActual.reps,20);assert.equal(saved.exercises[0].sets[0].hyroxActual.meters,40);valid(a);const b=setup(a.storage);b.run('editSavedLog(data.logs[0].id);saveLog("partial")');assert.deepEqual(b.snapshot('data.logs[0].exercises'),saved.exercises);valid(b)});
+test('changing the template exercise leaves historical results and current drafts byte-for-byte intact',()=>{const a=rounds(1);a.open(a.id);value(a,0,'meters','0.9');value(a,0,'seconds','4:30');done(a,0);a.run('saveLog("partial")');value(a,0,'note','Keep this history draft');const logs=a.snapshot('data.logs'),drafts=a.snapshot('logDrafts'),raw=a.storage.get(DRAFTS);a.run('editWorkout(data.workouts.at(-1).id)');const id=a.snapshot('editedWorkout().exercises[0].hyrox.partId');confirms(a,true);assert.equal(change(a,id,'wall'),true);a.run('saveWorkout()');assert.deepEqual(a.snapshot('data.logs'),logs);assert.deepEqual(a.snapshot('logDrafts'),drafts);assert.equal(a.storage.get(DRAFTS),raw);a.run('editSavedLog(data.logs[0].id)');assert.equal(a.snapshot('logState.items[0].hyrox.station'),'run');assert.equal(a.snapshot('logState.items[0].entries[0].hyroxInput.note'),'Keep this history draft');valid(a)});
+test('failed template save retains the changed station in the staged builder and leaves stored data unchanged',()=>{const a=rounds(1),id=editFirst(a,'ski');change(a,id,'wall');const old=a.storage.get(MAIN);a.blocked.add(MAIN);a.run('saveWorkout()');assert.equal(a.storage.get(MAIN),old);assert.equal(a.snapshot('editedWorkout().exercises[0].hyrox.station'),'wall');a.blocked.clear();a.run('saveWorkout()');assert.equal(a.snapshot('data.workouts.at(-1).exercises[0].hyrox.station'),'wall');valid(a)});
+for(const station of ['constructor','__proto__','rest',"');alert(1);//"])test('invalid exercise choice '+station+' cannot mutate a part',()=>{const a=rounds(1),id=editFirst(a,'run'),before=a.snapshot('editedWorkout()');assert.equal(change(a,id,station),false);assert.deepEqual(a.snapshot('editedWorkout()'),before)});
+test('all custom measurement fields are optional and no values are invented on selection',()=>{const a=rounds(1),id=editFirst(a,'custom');a.run('saveWorkout()');a.open(a.id);assert.deepEqual(a.snapshot('logState.items[0].entries[0].hyroxInput'),{meters:'',seconds:'',reps:'',kg:'',note:''});assert.equal(a.snapshot('logState.items[0].entries[0].done'),false);valid(a)});
+test('previous-result hints do not present another station as the result of the newly selected exercise',()=>{const a=rounds(1);a.open(a.id);value(a,0,'meters','0.9');value(a,0,'seconds','4:30');done(a,0);a.run('saveLog("complete");newLogSession()');assert.ok(a.run('hyroxPreviousHTML(logState.items[0])').includes('Forrige resultat:'));a.run('editWorkout(data.workouts.at(-1).id)');const id=a.snapshot('editedWorkout().exercises[0].hyrox.partId');change(a,id,'wall');a.run('saveWorkout();newLogSession()');assert.equal(a.snapshot('logState.items[0].hyrox.station'),'wall');assert.equal(a.run('hyroxPreviousHTML(logState.items[0])'),'');assert.equal(a.snapshot('data.logs[0].exercises[0].hyrox.station'),'run')});
